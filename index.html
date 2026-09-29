@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高配当株ウォッチリスト</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding-bottom: 85px; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- ヘッダー -->
+    <header class="bg-white px-4 py-3 shadow-sm flex justify-between items-center sticky top-0 z-40">
+        <h1 class="text-lg font-bold text-slate-800">配当管理シミュレーター</h1>
+        <button onclick="openModal()" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm active:scale-95 transition-transform">
+            ＋ 銘柄取込
+        </button>
+    </header>
+
+    <main class="max-w-xl mx-auto p-3 space-y-5">
+        
+        <!-- シミュレーター設定 -->
+        <section class="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
+            <h2 class="text-sm font-bold text-slate-500 mb-2">均等買いシミュレーター</h2>
+            <div class="flex items-center gap-2 mb-2">
+                <div class="flex-1 relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">予算</span>
+                    <input type="number" id="budgetInput" class="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-11 pr-8 text-right font-bold text-lg focus:outline-emerald-500" value="50" onchange="saveData(); render()" style="padding-right: 2.5rem;">
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">万円</span>
+                </div>
+                <button onclick="autoSelect()" class="bg-emerald-50 text-emerald-600 px-3 py-2 rounded-lg text-sm font-bold border border-emerald-100 active:scale-95 transition-transform whitespace-nowrap">
+                    ✨ おまかせ
+                </button>
+            </div>
+        </section>
+
+        <!-- グラフエリア -->
+        <section class="bg-white rounded-xl p-3 shadow-sm border border-slate-100 hidden" id="chartSection">
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <h3 class="text-xs font-bold text-slate-400 text-center mb-1">配当カレンダー(手取り)</h3>
+                    <div class="h-32"><canvas id="barChart"></canvas></div>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold text-slate-400 text-center mb-1">業種バランス</h3>
+                    <div class="h-32"><canvas id="pieChart"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ウォッチリスト -->
+        <section>
+            <div class="flex justify-between items-end mb-2 px-1">
+                <div class="text-sm font-bold text-slate-700">
+                    ウォッチリスト (<span id="listCount">0</span>)
+                </div>
+                <div class="text-xs text-slate-400 font-medium space-x-1.5 flex items-center">
+                    <button onclick="selectAll(true)" class="text-emerald-600 font-bold active:opacity-50">全選択</button>
+                    <span>|</span>
+                    <button onclick="selectAll(false)" class="active:opacity-50">全解除</button>
+                    <span>|</span>
+                    <button onclick="loadSampleData()" class="active:opacity-50">初期化</button>
+                </div>
+            </div>
+            
+            <div id="stockList" class="space-y-2">
+                <!-- カードがここに描画されます -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 固定フッター（サマリー）レイアウト圧縮版 -->
+    <div class="fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] pb-safe z-40">
+        <div class="max-w-xl mx-auto px-4 py-2.5">
+            <div class="flex justify-between items-end">
+                
+                <!-- 左側：買付情報 -->
+                <div class="mb-0.5">
+                    <div class="text-[11px] font-bold text-slate-500 mb-0.5">
+                        選択 <span id="selectedCount" class="text-slate-800 text-sm">0</span> 銘柄
+                    </div>
+                    <div class="text-sm font-medium text-slate-600 leading-tight">
+                        買付 <span id="totalCost" class="font-bold text-slate-800">0</span>円<br>
+                        <span class="text-[10px] text-slate-400">(余力: <span id="remainBudget">0</span>円)</span>
+                    </div>
+                </div>
+                
+                <!-- 右側：配当金情報 -->
+                <div class="text-right">
+                    <!-- 税引前と利回りを極小フォントで1行に -->
+                    <div class="text-[10px] text-slate-400 font-bold mb-1 tracking-tight">
+                        税引前: <span id="totalDividendGross">0</span>円 (利回り: <span id="averageYield">0.00</span>%)
+                    </div>
+                    <!-- 手取り情報（月額と年間を横に並べる） -->
+                    <div class="flex items-end justify-end gap-2">
+                        <div class="text-[10px] font-bold text-emerald-600/80 bg-emerald-50 px-1.5 py-0.5 rounded mb-0.5">
+                            月額 <span id="monthlyDividendNet" class="text-sm">0</span>円
+                        </div>
+                        <div class="text-2xl font-bold text-emerald-600 leading-none">
+                            <span id="totalDividendNet">0</span><span class="text-xs ml-0.5 text-emerald-600/80">円/年</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- 銘柄取込モーダル -->
+    <div id="importModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden opacity-0 transition-opacity duration-200 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden transform scale-95 transition-transform duration-200 flex flex-col max-h-[90vh]" id="modalContent">
+            
+            <div class="p-4 border-b border-slate-100 flex justify-between items-start shrink-0">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-800">銘柄データを取り込む</h3>
+                    <p class="text-xs text-slate-400 mt-1">Geminiで出力したテキストを直接貼り付け</p>
+                </div>
+                <button onclick="closeModal()" class="bg-slate-100 rounded-full p-1.5 text-slate-500 hover:bg-slate-200 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="p-4 space-y-5 overflow-y-auto">
+                <div class="bg-emerald-50/50 rounded-xl p-3 border border-emerald-100">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-sm text-slate-800">Gemini用プロンプト例</span>
+                        <button onclick="copyPrompt()" id="copyBtn" class="flex items-center gap-1 bg-white border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-md text-xs font-bold shadow-sm hover:bg-emerald-50 transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            コピー
+                        </button>
+                    </div>
+                    <pre class="bg-white border border-emerald-100 p-2.5 rounded-lg text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed">高配当銘柄を以下の形式で出力して(コード,社名,業種,現在株価,1株配当,権利確定月)：
+8058,三菱商事,卸売業,3080,100,3/9
+9432,NTT,情報・通信業,155,5.2,3/9</pre>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-sm text-slate-800">貼り付け欄:</span>
+                        <button onclick="pasteClipboard()" class="flex items-center gap-1 bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-xs font-bold hover:bg-slate-200 transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                            クリップボードから貼付
+                        </button>
+                    </div>
+                    <textarea id="csvInput" rows="5" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-emerald-500 font-mono text-slate-500" placeholder="8058,三菱商事,卸売業,3080,100,3/9..."></textarea>
+                </div>
+
+                <div class="flex items-center gap-5 text-sm text-slate-600">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="importMode" value="append" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500" checked>
+                        リストに追加 (重複は更新)
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="importMode" value="replace" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                        すべて置き換え
+                    </label>
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+                <button onclick="closeModal()" class="flex-1 bg-white border border-slate-200 text-slate-700 font-bold py-2.5 rounded-xl shadow-sm hover:bg-slate-50 transition-colors">閉じる</button>
+                <button onclick="importCSV()" class="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl shadow-sm hover:bg-emerald-700 transition-colors">登録する</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+const TAX_RATE = 0.20315; // 税率 20.315%
+const NET_RATIO = 1 - TAX_RATE; // 手取り率 約79.685%
+
+// --- 業種カラー定義 ---
+const explicitColors = {
+    'その他金融業': '#059669', '食料品': '#0d9488', '銀行業': '#0284c7', '鉱業': '#6366f1',
+    '保険業': '#8b5cf6', '医薬品': '#d946ef', 'ゴム製品': '#f59e0b', '情報・通信業': '#84cc16'
+};
+const fallbackColors = ['#0ea5e9', '#ec4899', '#14b8a6', '#f43f5e', '#8b5cf6', '#eab308', '#64748b', '#10b981'];
+
+function getSectorColor(sector) {
+    if (explicitColors[sector]) return explicitColors[sector];
+    let hash = 0;
+    for (let i = 0; i < sector.length; i++) hash = sector.charCodeAt(i) + ((hash << 5) - hash);
+    return fallbackColors[Math.abs(hash) % fallbackColors.length];
+}
+
+let stocks = [];
+let charts = { bar: null, pie: null };
+
+window.onload = () => {
+    const saved = localStorage.getItem('dividendStocks');
+    const savedBudget = localStorage.getItem('dividendBudget');
+    if (saved) stocks = JSON.parse(saved);
+    if (savedBudget) document.getElementById('budgetInput').value = savedBudget;
+    
+    if (stocks.length === 0) loadSampleData();
+    else render();
+};
+
+function loadSampleData() {
+    if(stocks.length > 0 && !confirm('現在のリストを初期化してサンプルデータを読み込みますか？')) return;
+    const sampleCsv = `8593,三菱HCキャピタル,その他金融業,1050,37,3/9\n2914,日本たばこ産業,食料品,4100,194,6/12\n8306,三菱UFJ FG,銀行業,1500,50,3/9\n1605,INPEX,鉱業,2200,76,6/12\n8766,東京海上HD,保険業,5500,159,3/9\n4502,武田薬品工業,医薬品,4200,196,3/9\n5108,ブリヂストン,ゴム製品,6500,210,6/12\n9432,日本電信電話,情報・通信業,155,5.2,3/9`;
+    parseAndAddCSV(sampleCsv);
+}
+
+function saveData() {
+    localStorage.setItem('dividendStocks', JSON.stringify(stocks));
+    localStorage.setItem('dividendBudget', document.getElementById('budgetInput').value);
+}
+
+function formatMan(num) {
+    if (num < 10000) return `${num}円`;
+    const man = Math.floor(num / 10000);
+    const sen = Math.floor((num % 10000) / 1000);
+    return sen > 0 ? `${man}.${sen}万` : `${man}万`;
+}
+
+function render() {
+    const listEl = document.getElementById('stockList');
+    listEl.innerHTML = '';
+    
+    const budgetTotal = parseFloat(document.getElementById('budgetInput').value) * 10000;
+    const selectedStocks = stocks.filter(s => s.selected);
+    const budgetPerStock = selectedStocks.length > 0 ? Math.floor(budgetTotal / selectedStocks.length) : 0;
+
+    let totalCost = 0;
+    let totalDivGross = 0;
+
+    document.getElementById('listCount').textContent = stocks.length;
+    document.getElementById('selectedCount').textContent = selectedStocks.length;
+
+    stocks.forEach((stock) => {
+        let shares = 0;
+        let cost = 0;
+        let divGross = 0;
+
+        if (stock.selected) {
+            shares = Math.floor(budgetPerStock / stock.price);
+            cost = shares * stock.price;
+            divGross = shares * stock.dividend;
+            totalCost += cost;
+            totalDivGross += divGross;
+        }
+
+        const sColor = getSectorColor(stock.sector);
+        const cardBg = stock.selected ? 'bg-emerald-50/20 border-2 border-emerald-500' : 'bg-white border-2 border-transparent shadow-sm ring-1 ring-slate-200';
+        const divNetItem = Math.floor(divGross * NET_RATIO);
+        
+        const card = document.createElement('div');
+        card.className = `relative px-2.5 py-2 rounded-xl cursor-pointer transition-all ${cardBg}`;
+        card.onclick = () => toggleSelect(stock.code);
+        card.innerHTML = `
+            <button class="absolute bottom-2 right-2 p-1 text-slate-300 hover:text-red-500 transition-colors z-10" onclick="event.stopPropagation(); deleteStock('${stock.code}')">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+            <div class="flex items-center gap-1.5 mb-1">
+                <span class="bg-slate-100 text-slate-600 px-1 py-0.5 rounded text-[11px] font-medium tracking-wide">${stock.code}</span>
+                <span class="font-bold text-base leading-none text-slate-800">${stock.name}</span>
+                <span class="text-[10px] px-1 py-0.5 rounded font-medium" style="background-color: ${sColor}15; color: ${sColor}">${stock.sector}</span>
+            </div>
+            <div class="flex items-baseline gap-1.5 mb-0.5">
+                ${stock.selected ? `
+                    <span class="font-bold text-sm text-slate-800">${shares}株</span>
+                    <span class="text-slate-400 text-xs">(${formatMan(cost)})</span>
+                    <span class="text-emerald-600 font-bold text-sm ml-1">+${divNetItem.toLocaleString()}円/年<span class="text-[10px] ml-0.5 text-emerald-600/70">(手取り)</span></span>
+                ` : `
+                    <span class="text-slate-400 text-[11px] h-5 flex items-center">タップでシミュレーションに追加</span>
+                `}
+            </div>
+            <div class="flex items-baseline gap-2 text-[11px] text-slate-500 font-medium">
+                <span>${stock.price.toLocaleString()}円</span>
+                <span>利回り <span class="text-emerald-600 font-bold">${stock.yield}%</span></span>
+                <span>権利: ${stock.months}</span>
+            </div>
+        `;
+        listEl.appendChild(card);
+    });
+
+    const totalDivNet = Math.floor(totalDivGross * NET_RATIO);
+    const monthlyDivNet = Math.floor(totalDivNet / 12);
+    const avgYield = totalCost > 0 ? ((totalDivGross / totalCost) * 100).toFixed(2) : "0.00";
+    
+    document.getElementById('totalCost').textContent = totalCost.toLocaleString();
+    document.getElementById('remainBudget').textContent = (budgetTotal - totalCost).toLocaleString();
+    
+    document.getElementById('totalDividendGross').textContent = Math.floor(totalDivGross).toLocaleString();
+    document.getElementById('totalDividendNet').textContent = totalDivNet.toLocaleString();
+    document.getElementById('monthlyDividendNet').textContent = monthlyDivNet.toLocaleString();
+    document.getElementById('averageYield').textContent = avgYield;
+    
+    updateCharts(selectedStocks, budgetPerStock);
+}
+
+function toggleSelect(code) { const stock = stocks.find(s => s.code === code); if (stock) stock.selected = !stock.selected; saveData(); render(); }
+function selectAll(state) { stocks.forEach(s => s.selected = state); saveData(); render(); }
+function deleteStock(code) { stocks = stocks.filter(s => s.code !== code); saveData(); render(); }
+function autoSelect() {
+    selectAll(false);
+    const topBySector = {};
+    stocks.forEach(s => { if (!topBySector[s.sector] || s.yield > topBySector[s.sector].yield) topBySector[s.sector] = s; });
+    Object.values(topBySector).sort((a, b) => b.yield - a.yield).slice(0, 8).forEach(s => s.selected = true);
+    saveData(); render();
+}
+
+const modal = document.getElementById('importModal');
+const modalContent = document.getElementById('modalContent');
+function openModal() { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modalContent.classList.remove('scale-95'); }, 10); }
+function closeModal() { modal.classList.add('opacity-0'); modalContent.classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); }
+
+function copyPrompt() {
+    navigator.clipboard.writeText(`高配当銘柄を以下の形式で出力して(コード,社名,業種,現在株価,1株配当,権利確定月)：\n8058,三菱商事,卸売業,3080,100,3/9\n9432,NTT,情報・通信業,155,5.2,3/9`).then(() => {
+        const btn = document.getElementById('copyBtn');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> コピー完了!`;
+        btn.classList.add('text-emerald-600', 'bg-emerald-50');
+        setTimeout(() => { btn.innerHTML = originalHTML; btn.classList.remove('text-emerald-600', 'bg-emerald-50'); }, 2000);
+    });
+}
+
+async function pasteClipboard() {
+    try { document.getElementById('csvInput').value = await navigator.clipboard.readText(); } 
+    catch (err) { alert('クリップボードの読み取りが許可されていません。手動で貼り付けてください。'); }
+}
+
+function importCSV() {
+    const text = document.getElementById('csvInput').value;
+    if(!text.trim()) return closeModal();
+    if (document.querySelector('input[name="importMode"]:checked').value === 'replace') stocks = [];
+    parseAndAddCSV(text);
+    document.getElementById('csvInput').value = '';
+    closeModal();
+}
+
+function parseAndAddCSV(csvText) {
+    csvText.trim().split('\n').forEach(line => {
+        const [code, name, sector, price, dividend, months] = line.split(',');
+        if (code && name && price && dividend) {
+            const p = parseFloat(price); const d = parseFloat(dividend); const y = ((d / p) * 100).toFixed(2);
+            const existIdx = stocks.findIndex(s => s.code === code);
+            const newData = { code, name, sector, price: p, dividend: d, yield: y, months: months||'', selected: true };
+            if (existIdx >= 0) stocks[existIdx] = newData; else stocks.push(newData);
+        }
+    });
+    saveData(); render();
+}
+
+function updateCharts(selectedStocks, budgetPerStock) {
+    const chartSec = document.getElementById('chartSection');
+    if (selectedStocks.length === 0) { chartSec.classList.add('hidden'); return; }
+    chartSec.classList.remove('hidden');
+
+    const monthData = new Array(12).fill(0);
+    const sectorData = {};
+
+    selectedStocks.forEach(stock => {
+        const shares = Math.floor(budgetPerStock / stock.price);
+        const divNet = (shares * stock.dividend) * NET_RATIO;
+        
+        sectorData[stock.sector] = (sectorData[stock.sector] || 0) + divNet;
+
+        const m = stock.months.split(/[/・、]/).map(x => parseInt(x.replace(/[^0-9]/g, ''))).filter(x => !isNaN(x));
+        if (m.length > 0) {
+            const divPerMonth = divNet / m.length;
+            m.forEach(month => { if (month >= 1 && month <= 12) monthData[month - 1] += divPerMonth; });
+        }
+    });
+
+    if (charts.bar) charts.bar.destroy();
+    if (charts.pie) charts.pie.destroy();
+
+    Chart.defaults.font.family = '-apple-system, sans-serif';
+    Chart.defaults.color = '#94a3b8';
+
+    charts.bar = new Chart(document.getElementById('barChart'), {
+        type: 'bar',
+        data: { labels: ['1','2','3','4','5','6','7','8','9','10','11','12'], datasets: [{ data: monthData, backgroundColor: '#34d399', borderRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => Math.floor(c.raw).toLocaleString() + '円' } } }, scales: { x: { grid: { display: false } }, y: { display: false, beginAtZero: true } } }
+    });
+
+    const secLabels = Object.keys(sectorData);
+    charts.pie = new Chart(document.getElementById('pieChart'), {
+        type: 'doughnut',
+        data: { labels: secLabels, datasets: [{ data: Object.values(sectorData), backgroundColor: secLabels.map(l => getSectorColor(l)), borderWidth: 2, borderColor: '#ffffff' }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    });
+}
+</script>
+</body>
+</html>
