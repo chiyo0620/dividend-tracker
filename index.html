@@ -1,403 +1,977 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高配当株ウォッチリスト</title>
-    <!-- ホーム画面用アイコン（iOS用） -->
-    <link rel="apple-touch-icon" href="icon.png">
-    
-    <!-- 通常のブラウザタブ用アイコン -->
-    <link rel="icon" type="image/png" href="icon.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="300">
+  <title>家族用 宿題アンテナ</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --urgent: #ef4444;
+      --warning: #f59e0b;
+      --normal: #3b82f6;
+      --study: #10b981;
 
-    <!-- アプリっぽく起動させる設定（Safariの上下バーを非表示にする） -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="配当管理">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding-bottom: 85px; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
+      /* 指定教科カラー */
+      --subj-japanese: #dc2626; /* 国語・文法：赤 */
+      --subj-math:     #2563eb; /* 算数・代数・幾何：青 */
+      --subj-english:  #7c3aed; /* 英語・Grammar・Reading：紫 */
+      --subj-science:  #059669; /* 理科：緑 */
+      --subj-social:   #b45309; /* 社会：茶 */
+      --subj-other:    #475569; /* その他 */
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    /* ヘッダー */
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .header-left h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.5rem; }
+    .header-left .updated { font-size: 0.85rem; color: var(--text-sub); margin-top: 0.2rem; }
+    .header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+
+    .btn {
+      border: none;
+      padding: 0.45rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary { background: #334155; color: #f8fafc; border: 1px solid #475569; }
+    .btn-secondary:hover { background: #475569; }
+    .btn-accent { background: #059669; color: white; }
+    .btn-accent:hover { background: #047857; }
+
+    /* 教科別バッジスタイル */
+    .badge-subject {
+      font-size: 0.75rem;
+      font-weight: bold;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      color: #ffffff;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .subj-japanese { background-color: var(--subj-japanese); }
+    .subj-math     { background-color: var(--subj-math); }
+    .subj-english  { background-color: var(--subj-english); }
+    .subj-science  { background-color: var(--subj-science); }
+    .subj-social   { background-color: var(--subj-social); }
+    .subj-other    { background-color: var(--subj-other); }
+
+    /* 小テスト掲示板エリア */
+    .test-banner-container {
+      background: #182234;
+      border: 1px solid #2d3f5e;
+      border-radius: 12px;
+      padding: 0.85rem 1.2rem;
+      margin-bottom: 1.5rem;
+    }
+    .test-banner-header {
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: #38bdf8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.6rem;
+    }
+    
+    .test-row-wrapper {
+      position: relative;
+      display: flex;
+      gap: 0.75rem;
+      align-items: stretch;
+      overflow: hidden; 
+    }
+
+    .test-card {
+      flex: 1 1 0;
+      min-width: 220px;
+      max-width: 320px;
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+      border-left: 5px solid var(--normal);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+    }
+    .test-card.border-japanese { border-left-color: var(--subj-japanese); }
+    .test-card.border-math     { border-left-color: var(--subj-math); }
+    .test-card.border-english  { border-left-color: var(--subj-english); }
+    .test-card.border-science  { border-left-color: var(--subj-science); }
+    .test-card.border-social   { border-left-color: var(--subj-social); }
+    .test-card.border-other    { border-left-color: var(--subj-other); }
+
+    .test-card.is-tomorrow {
+      background: linear-gradient(135deg, #1e293b 60%, rgba(239, 68, 68, 0.25) 100%);
+      animation: pulse-border 2s infinite;
+    }
+    .test-info { display: flex; flex-direction: column; gap: 0.2rem; overflow: hidden; }
+    .test-name {
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .test-date-badge {
+      font-size: 0.7rem;
+      font-weight: bold;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      background: #334155;
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+    .test-date-badge.urgent { background: var(--urgent); color: #fff; }
+
+    .test-more-card {
+      flex: 0 0 auto;
+      background: linear-gradient(135deg, #1e293b, #28354b);
+      border: 1px dashed #475569;
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      color: #38bdf8;
+      font-size: 0.85rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .test-more-card:hover {
+      background: #2a3a54;
+      border-color: #38bdf8;
+      color: #fff;
+    }
+
+    /* メイン2カラムレイアウト */
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .dashboard-layout { grid-template-columns: 1fr; }
+      .test-row-wrapper { flex-wrap: wrap; }
+      .test-card { min-width: 100%; max-width: 100%; }
+    }
+
+    .column-title {
+      font-size: 1.15rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 0.4rem;
+      border-bottom: 2px solid var(--card-border);
+    }
+    .column-title.urgent { border-bottom-color: var(--urgent); color: #f87171; }
+    .column-title.normal { border-bottom-color: var(--normal); color: #38bdf8; }
+
+    /* 左カラム：集中フォーカスカード */
+    .urgent-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .focus-card {
+      background: var(--card-bg);
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      border-left: 6px solid var(--urgent);
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    .focus-card.study-task {
+      border-left-color: var(--study);
+      background: linear-gradient(135deg, #1e293b 70%, rgba(16, 185, 129, 0.15) 100%);
+    }
+    .focus-card.urgent-task {
+      background: linear-gradient(135deg, #1e293b 70%, #451a1a 100%);
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .badge-group { display: flex; align-items: center; gap: 0.4rem; }
+    .badge-state {
+      font-size: 0.75rem;
+      font-weight: bold;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+    .badge-manual { background: #334155; color: #fde047; border: 1px solid #eab308; }
+    .badge-study  { background: #059669; color: #fff; }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: bold;
+      line-height: 1.4;
+      margin-bottom: 0.5rem;
+    }
+    .card-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+    }
+
+    /* 右カラム：スリム1行リスト */
+    .list-section {
+      margin-bottom: 1.2rem;
+      background: var(--card-bg);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+    }
+    .list-header {
+      background: #182234;
+      padding: 0.65rem 1rem;
+      font-size: 0.9rem;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .list-header:hover { background: #1e2b42; }
+    .list-group { list-style: none; }
+    .list-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 1rem;
+      border-top: 1px solid #283548;
+      font-size: 0.9rem;
+      transition: background 0.15s;
+    }
+    .list-row:hover { background: #263349; }
+    .row-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-main);
+    }
+    .row-deadline {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      white-space: nowrap;
+    }
+
+    .delete-btn {
+      background: transparent;
+      color: var(--text-sub);
+      border: 1px solid #475569;
+      border-radius: 4px;
+      padding: 0.2rem 0.45rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .delete-btn:hover {
+      background: var(--urgent);
+      color: white;
+      border-color: var(--urgent);
+    }
+
+    /* モーダル */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(2px);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-content {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 480px;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 1.5rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    .modal-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 1rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.85rem; color: var(--text-sub); margin-bottom: 0.3rem; }
+    .form-control {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      color: #fff;
+      padding: 0.6rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+    .form-control:focus { outline: none; border-color: var(--normal); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
+
+    @keyframes pulse-border {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body>
 
-    <!-- ヘッダー -->
-    <header class="bg-white px-4 py-3 shadow-sm flex justify-between items-center sticky top-0 z-40">
-        <h1 class="text-lg font-bold text-slate-800">配当管理シミュレーター</h1>
-        <button onclick="openModal()" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm active:scale-95 transition-transform">
-            ＋ 銘柄取込
-        </button>
-    </header>
+  <header>
+    <div class="header-left">
+      <h1>📡 宿題アンテナ</h1>
+      <div class="updated" id="updatedAt">確認中...</div>
+      <div id="syncStatus" style="font-size: 0.85rem; color: #4ade80; font-weight: bold; margin-top: 4px;"></div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-accent" onclick="openModal('taskModal')">✏️ 宿題タスクを追加</button>
+      <button class="btn btn-secondary" onclick="openModal('testModal')">📅 小テストを登録</button>
+      <button class="btn btn-primary" id="syncBtn" onclick="triggerWorkflowSync()">🔄 ロイロから同期</button>
+    </div>
+  </header>
 
-    <main class="max-w-xl mx-auto p-3 space-y-5">
-        
-        <!-- シミュレーター設定 -->
-        <section class="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
-            <h2 class="text-sm font-bold text-slate-500 mb-2">均等買いシミュレーター</h2>
-            <div class="flex items-center gap-2 mb-2">
-                <div class="flex-1 relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">予算</span>
-                    <input type="number" id="budgetInput" class="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-11 pr-8 text-right font-bold text-lg focus:outline-emerald-500" value="50" onchange="saveData(); render()" style="padding-right: 2.5rem;">
-                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">万円</span>
-                </div>
-                <button onclick="autoSelect()" class="bg-emerald-50 text-emerald-600 px-3 py-2 rounded-lg text-sm font-bold border border-emerald-100 active:scale-95 transition-transform whitespace-nowrap">
-                    ✨ おまかせ
-                </button>
-            </div>
-        </section>
+  <section class="test-banner-container">
+    <div class="test-banner-header">
+      <span>📅 直近の小テスト予定</span>
+      <button class="btn btn-secondary" style="font-size:0.75rem; padding:0.2rem 0.5rem;" onclick="openModal('allTestsModal')">📋 すべてのテストを見る (<span id="allTestCount">0</span>)</button>
+    </div>
+    <div class="test-row-wrapper" id="testRowContainer"></div>
+  </section>
 
-        <!-- グラフエリア -->
-        <section class="bg-white rounded-xl p-3 shadow-sm border border-slate-100 hidden" id="chartSection">
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <h3 class="text-xs font-bold text-slate-400 text-center mb-1">配当カレンダー(手取り)</h3>
-                    <div class="h-32"><canvas id="barChart"></canvas></div>
-                </div>
-                <div>
-                    <h3 class="text-xs font-bold text-slate-400 text-center mb-1">業種バランス</h3>
-                    <div class="h-32"><canvas id="pieChart"></canvas></div>
-                </div>
-            </div>
-        </section>
-
-        <!-- ウォッチリスト -->
-        <section>
-            <div class="flex justify-between items-end mb-2 px-1">
-                <div class="text-sm font-bold text-slate-700">
-                    ウォッチリスト (<span id="listCount">0</span>)
-                </div>
-                <div class="text-xs text-slate-400 font-medium space-x-1.5 flex items-center">
-                    <button onclick="selectAll(true)" class="text-emerald-600 font-bold active:opacity-50">全選択</button>
-                    <span>|</span>
-                    <button onclick="selectAll(false)" class="active:opacity-50">全解除</button>
-                    <span>|</span>
-                    <button onclick="loadSampleData()" class="active:opacity-50">初期化</button>
-                </div>
-            </div>
-            
-            <div id="stockList" class="space-y-2">
-                <!-- カードがここに描画されます -->
-            </div>
-        </section>
-
-    </main>
-
-    <!-- 固定フッター（サマリー）レイアウト圧縮版 -->
-    <div class="fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] pb-safe z-40">
-        <div class="max-w-xl mx-auto px-4 py-2.5">
-            <div class="flex justify-between items-end">
-                
-                <!-- 左側：買付情報 -->
-                <div class="mb-0.5">
-                    <div class="text-[11px] font-bold text-slate-500 mb-0.5">
-                        選択 <span id="selectedCount" class="text-slate-800 text-sm">0</span> 銘柄
-                    </div>
-                    <div class="text-sm font-medium text-slate-600 leading-tight">
-                        買付 <span id="totalCost" class="font-bold text-slate-800">0</span>円<br>
-                        <span class="text-[10px] text-slate-400">(余力: <span id="remainBudget">0</span>円)</span>
-                    </div>
-                </div>
-                
-                <!-- 右側：配当金情報 -->
-                <div class="text-right">
-                    <!-- 税引前と利回りを極小フォントで1行に -->
-                    <div class="text-[10px] text-slate-400 font-bold mb-1 tracking-tight">
-                        税引前: <span id="totalDividendGross">0</span>円 (利回り: <span id="averageYield">0.00</span>%)
-                    </div>
-                    <!-- 手取り情報（月額と年間を横に並べる） -->
-                    <div class="flex items-end justify-end gap-2">
-                        <div class="text-[10px] font-bold text-emerald-600/80 bg-emerald-50 px-1.5 py-0.5 rounded mb-0.5">
-                            月額 <span id="monthlyDividendNet" class="text-sm">0</span>円
-                        </div>
-                        <div class="text-2xl font-bold text-emerald-600 leading-none">
-                            <span id="totalDividendNet">0</span><span class="text-xs ml-0.5 text-emerald-600/80">円/年</span>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
+  <main class="dashboard-layout">
+    <div class="left-col">
+      <div class="column-title urgent">
+        <span>🚨 今日のやること（至急・テスト対策）</span>
+        <span id="urgentCountBadge" style="font-size:0.85rem; font-weight:normal;"></span>
+      </div>
+      <div class="urgent-stack" id="urgentContainer"></div>
     </div>
 
-    <!-- 銘柄取込モーダル -->
-    <div id="importModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden opacity-0 transition-opacity duration-200 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden transform scale-95 transition-transform duration-200 flex flex-col max-h-[90vh]" id="modalContent">
-            
-            <div class="p-4 border-b border-slate-100 flex justify-between items-start shrink-0">
-                <div>
-                    <h3 class="font-bold text-lg text-slate-800">銘柄データを取り込む</h3>
-                    <p class="text-xs text-slate-400 mt-1">Geminiで出力したテキストを直接貼り付け</p>
-                </div>
-                <button onclick="closeModal()" class="bg-slate-100 rounded-full p-1.5 text-slate-500 hover:bg-slate-200 transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
+    <div class="right-col">
+      <div class="column-title normal">
+        <span>📋 今後の宿題・控えリスト</span>
+      </div>
 
-            <div class="p-4 space-y-5 overflow-y-auto">
-                <div class="bg-emerald-50/50 rounded-xl p-3 border border-emerald-100">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-sm text-slate-800">Gemini用プロンプト例</span>
-                        <button onclick="copyPrompt()" id="copyBtn" class="flex items-center gap-1 bg-white border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-md text-xs font-bold shadow-sm hover:bg-emerald-50 transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                            コピー
-                        </button>
-                    </div>
-                    <pre class="bg-white border border-emerald-100 p-2.5 rounded-lg text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed">高配当銘柄を以下の形式で出力して(コード,社名,業種,現在株価,1株配当,権利確定月)：
-8058,三菱商事,卸売業,3080,100,3/9
-9432,NTT,情報・通信業,155,5.2,3/9</pre>
-                </div>
-
-                <div>
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-sm text-slate-800">貼り付け欄:</span>
-                        <button onclick="pasteClipboard()" class="flex items-center gap-1 bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-xs font-bold hover:bg-slate-200 transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                            クリップボードから貼付
-                        </button>
-                    </div>
-                    <textarea id="csvInput" rows="5" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:outline-emerald-500 font-mono text-slate-500" placeholder="8058,三菱商事,卸売業,3080,100,3/9..."></textarea>
-                </div>
-
-                <div class="flex items-center gap-5 text-sm text-slate-600">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="importMode" value="append" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500" checked>
-                        リストに追加 (重複は更新)
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="importMode" value="replace" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
-                        すべて置き換え
-                    </label>
-                </div>
-            </div>
-
-            <div class="p-4 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
-                <button onclick="closeModal()" class="flex-1 bg-white border border-slate-200 text-slate-700 font-bold py-2.5 rounded-xl shadow-sm hover:bg-slate-50 transition-colors">閉じる</button>
-                <button onclick="importCSV()" class="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl shadow-sm hover:bg-emerald-700 transition-colors">登録する</button>
-            </div>
+      <div class="list-section">
+        <div class="list-header" style="color: #fbbf24;" onclick="toggleCollapse('warningList')">
+          <span>⚠️ 3日以内締め切り (<span id="warningCount">0</span>)</span>
+          <span id="warningList-arrow">▼</span>
         </div>
+        <div class="list-group" id="warningList"></div>
+      </div>
+
+      <div class="list-section">
+        <div class="list-header" style="color: #38bdf8;" onclick="toggleCollapse('normalList')">
+          <span>📘 今後の宿題 (<span id="normalCount">0</span>)</span>
+          <span id="normalList-arrow">▼</span>
+        </div>
+        <div class="list-group" id="normalList"></div>
+      </div>
+
+      <div class="list-section">
+        <div class="list-header" style="color: #c084fc;" onclick="toggleCollapse('overdueList')">
+          <span>⏰ 期限を過ぎた宿題 (<span id="overdueCount">0</span>)</span>
+          <span id="overdueList-arrow">▼</span>
+        </div>
+        <div class="list-group" id="overdueList"></div>
+      </div>
     </div>
+  </main>
 
-<script>
-const TAX_RATE = 0.20315; // 税率 20.315%
-const NET_RATIO = 1 - TAX_RATE; // 手取り率 約79.685%
+  <div id="resetArea" style="display:none; text-align: center; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #334155;">
+    <button class="btn btn-secondary" onclick="clearHiddenTasks()">🗑 完了（非表示）にした課題をクラウドからリセット</button>
+  </div>
 
-// --- 業種カラー定義 ---
-const explicitColors = {
-    'その他金融業': '#059669', '食料品': '#0d9488', '銀行業': '#0284c7', '鉱業': '#6366f1',
-    '保険業': '#8b5cf6', '医薬品': '#d946ef', 'ゴム製品': '#f59e0b', '情報・通信業': '#84cc16'
-};
-const fallbackColors = ['#0ea5e9', '#ec4899', '#14b8a6', '#f43f5e', '#8b5cf6', '#eab308', '#64748b', '#10b981'];
+  <!-- 各種モーダルは構造変更なし -->
+  <div class="modal-backdrop" id="taskModal">
+    <div class="modal-content">
+      <div class="modal-title">✏️️ 宿題を追加</div>
+      <div class="form-group">
+        <label>教科</label>
+        <input type="text" id="manualSubject" class="form-control" placeholder="例: 算数プリント, 自主学習, 理科, 社会">
+      </div>
+      <div class="form-group">
+        <label>課題名</label>
+        <input type="text" id="manualTitle" class="form-control" placeholder="例: ワーク p.24〜25">
+      </div>
+      <div class="form-group">
+        <label>締切日時</label>
+        <input type="datetime-local" id="manualDeadline" class="form-control">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('taskModal')">キャンセル</button>
+        <button class="btn btn-accent" onclick="saveManualTask()">登録する</button>
+      </div>
+    </div>
+  </div>
 
-function getSectorColor(sector) {
-    if (explicitColors[sector]) return explicitColors[sector];
-    let hash = 0;
-    for (let i = 0; i < sector.length; i++) hash = sector.charCodeAt(i) + ((hash << 5) - hash);
-    return fallbackColors[Math.abs(hash) % fallbackColors.length];
-}
+  <div class="modal-backdrop" id="testModal">
+    <div class="modal-content">
+      <div class="modal-title">📅 小テスト予定を追加</div>
+      <div class="form-group">
+        <label>教科</label>
+        <input type="text" id="testSubject" class="form-control" placeholder="例: 代数, Grammar, 漢字, 理科1, 社会">
+      </div>
+      <div class="form-group">
+        <label>テスト名・範囲</label>
+        <input type="text" id="testTitle" class="form-control" placeholder="例: 正負の数 小テスト (プリントNo.1〜10)">
+      </div>
+      <div class="form-group">
+        <label>テスト実施日</label>
+        <input type="date" id="testDate" class="form-control">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('testModal')">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveTestSchedule()">登録する</button>
+      </div>
+    </div>
+  </div>
 
-let stocks = [];
-let charts = { bar: null, pie: null };
+  <div class="modal-backdrop" id="allTestsModal">
+    <div class="modal-content">
+      <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>📅 小テスト予定（全件一覧）</span>
+        <button class="delete-btn" onclick="closeModal('allTestsModal')">✕ 閉じる</button>
+      </div>
+      <div id="allTestsListContainer" style="display:flex; flex-direction:column; gap:0.6rem; margin-top:1rem;"></div>
+      <div class="modal-actions" style="margin-top:1.5rem;">
+        <button class="btn btn-primary" onclick="closeModal('allTestsModal'); openModal('testModal');">＋ 新規小テストを追加</button>
+      </div>
+    </div>
+  </div>
 
-window.onload = () => {
-    const saved = localStorage.getItem('dividendStocks');
-    const savedBudget = localStorage.getItem('dividendBudget');
-    if (saved) stocks = JSON.parse(saved);
-    if (savedBudget) document.getElementById('budgetInput').value = savedBudget;
-    
-    if (stocks.length === 0) loadSampleData();
-    else render();
-};
+  <script>
+    const OWNER = "chiyo0620";
+    const REPO = "homework-dashboard-8f92a1b3";
+    const USER_DATA_PATH = "user_data.json";
 
-function loadSampleData() {
-    if(stocks.length > 0 && !confirm('現在のリストを初期化してサンプルデータを読み込みますか？')) return;
-    const sampleCsv = `8593,三菱HCキャピタル,その他金融業,1050,37,3/9\n2914,日本たばこ産業,食料品,4100,194,6/12\n8306,三菱UFJ FG,銀行業,1500,50,3/9\n1605,INPEX,鉱業,2200,76,6/12\n8766,東京海上HD,保険業,5500,159,3/9\n4502,武田薬品工業,医薬品,4200,196,3/9\n5108,ブリヂストン,ゴム製品,6500,210,6/12\n9432,日本電信電話,情報・通信業,155,5.2,3/9`;
-    parseAndAddCSV(sampleCsv);
-}
+    let rawHomeworkItems = [];
+    let userDataSha = null;
+    let userData = { tests: [], manual_tasks: [], hidden_tasks: [] };
 
-function saveData() {
-    localStorage.setItem('dividendStocks', JSON.stringify(stocks));
-    localStorage.setItem('dividendBudget', document.getElementById('budgetInput').value);
-}
+    // --- エラー時に自動削除できるよう修正 ---
+    function getToken(forcePrompt = false) {
+      let token = localStorage.getItem('gh_pat_token');
+      if (!token || forcePrompt) {
+        token = prompt('【GitHub Token入力】\n※「repo」と「workflow」の両方の権限にチェックを入れたPersonal Access Tokenを入力してください:');
+        if (token) localStorage.setItem('gh_pat_token', token.trim());
+      }
+      return token ? token.trim() : null;
+    }
 
-function formatMan(num) {
-    if (num < 10000) return `${num}円`;
-    const man = Math.floor(num / 10000);
-    const sen = Math.floor((num % 10000) / 1000);
-    return sen > 0 ? `${man}.${sen}万` : `${man}万`;
-}
-
-function render() {
-    const listEl = document.getElementById('stockList');
-    listEl.innerHTML = '';
-    
-    const budgetTotal = parseFloat(document.getElementById('budgetInput').value) * 10000;
-    const selectedStocks = stocks.filter(s => s.selected);
-    const budgetPerStock = selectedStocks.length > 0 ? Math.floor(budgetTotal / selectedStocks.length) : 0;
-
-    let totalCost = 0;
-    let totalDivGross = 0;
-
-    document.getElementById('listCount').textContent = stocks.length;
-    document.getElementById('selectedCount').textContent = selectedStocks.length;
-
-    stocks.forEach((stock) => {
-        let shares = 0;
-        let cost = 0;
-        let divGross = 0;
-
-        if (stock.selected) {
-            shares = Math.floor(budgetPerStock / stock.price);
-            cost = shares * stock.price;
-            divGross = shares * stock.dividend;
-            totalCost += cost;
-            totalDivGross += divGross;
+    async function loadAllData() {
+      try {
+        const res = await fetch('./data.json?t=' + Date.now());
+        if (res.ok) {
+          const data = await res.json();
+          rawHomeworkItems = data.items || [];
+          let isoStr = data.updated_at || '';
+          if (isoStr && !isoStr.endsWith('Z') && !isoStr.includes('+')) {
+            isoStr = isoStr.replace(' ', 'T') + 'Z';
+          }
+          if (isoStr) {
+            const localDate = new Date(isoStr);
+            const jstString = localDate.toLocaleString("ja-JP", { 
+              timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+            });
+            document.getElementById('updatedAt').textContent = '最終抽出: ' + jstString;
+          }
         }
+      } catch (err) {
+        console.error("ロイロデータ読み込みエラー:", err);
+      }
 
-        const sColor = getSectorColor(stock.sector);
-        const cardBg = stock.selected ? 'bg-emerald-50/20 border-2 border-emerald-500' : 'bg-white border-2 border-transparent shadow-sm ring-1 ring-slate-200';
-        const divNetItem = Math.floor(divGross * NET_RATIO);
-        
+      await fetchUserData();
+      renderApp();
+    }
+
+    async function fetchUserData() {
+      const token = localStorage.getItem('gh_pat_token');
+      const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${USER_DATA_PATH}`;
+      
+      try {
+        const headers = { "Accept": "application/vnd.github.v3+json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        const res = await fetch(url + '?t=' + Date.now(), { headers });
+        if (res.ok) {
+          const fileInfo = await res.json();
+          userDataSha = fileInfo.sha;
+          const decoded = decodeURIComponent(escape(atob(fileInfo.content)));
+          userData = JSON.parse(decoded);
+          document.getElementById('syncStatus').textContent = "✅ 最新のデータを取得しました";
+        } else if (res.status === 404) {
+          userData = { tests: [], manual_tasks: [], hidden_tasks: [] };
+          document.getElementById('syncStatus').textContent = "✅ 新規データとして初期化完了";
+        } else {
+          // Tokenエラー時は消去
+          if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem('gh_pat_token');
+          }
+          const fb = await fetch('./' + USER_DATA_PATH + '?t=' + Date.now());
+          if(fb.ok) userData = await fb.json();
+          document.getElementById('syncStatus').textContent = "⚠️ 読み取り専用モード（キャッシュ表示）";
+        }
+      } catch (e) {
+        try {
+          const fb = await fetch('./' + USER_DATA_PATH + '?t=' + Date.now());
+          if(fb.ok) userData = await fb.json();
+        } catch(e2) {}
+        document.getElementById('syncStatus').textContent = "⚠️ 読み取り専用モード（キャッシュ表示）";
+      }
+
+      if (!userData.tests) userData.tests = [];
+      if (!userData.manual_tasks) userData.manual_tasks = [];
+      if (!userData.hidden_tasks) userData.hidden_tasks = [];
+      
+      setTimeout(() => { document.getElementById('syncStatus').textContent = ""; }, 3000);
+    }
+
+    async function saveUserData() {
+      const token = getToken();
+      if (!token) return false;
+
+      const syncStatus = document.getElementById('syncStatus');
+      syncStatus.textContent = "☁️ クラウドへ同期中...";
+      syncStatus.style.color = "#f59e0b";
+
+      const contentStr = JSON.stringify(userData, null, 2);
+      const encoded = btoa(unescape(encodeURIComponent(contentStr)));
+
+      const body = {
+        message: "Update manual task data",
+        content: encoded,
+        branch: "main"
+      };
+      if (userDataSha) body.sha = userDataSha;
+
+      try {
+        const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${USER_DATA_PATH}`, {
+          method: "PUT",
+          headers: {
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          userDataSha = data.content.sha;
+          syncStatus.textContent = "✅ クラウドと完全に同期しました";
+          syncStatus.style.color = "#4ade80";
+          setTimeout(() => { syncStatus.textContent = ""; }, 3000);
+          return true;
+        } else {
+          // 保存時の権限エラー処理
+          if (res.status === 401 || res.status === 403 || res.status === 404) {
+            localStorage.removeItem('gh_pat_token');
+            alert("Tokenが無効か権限(repo)が不足しています。ページを更新して正しいTokenを再入力してください。");
+          } else {
+            const err = await res.json();
+            alert(`保存エラー: ${err.message}`);
+          }
+          syncStatus.textContent = "❌ 同期エラー";
+          syncStatus.style.color = "#ef4444";
+          return false;
+        }
+      } catch (e) {
+        alert("ネットワークエラーが発生しました。");
+        syncStatus.textContent = "❌ 同期エラー";
+        syncStatus.style.color = "#ef4444";
+        return false;
+      }
+    }
+
+    // --- ロイロから同期（スクレイパー起動）の修正 ---
+    async function triggerWorkflowSync() {
+      const syncBtn = document.getElementById('syncBtn');
+      const syncStatus = document.getElementById('syncStatus');
+      let token = getToken();
+      if (!token) return;
+
+      syncBtn.disabled = true; syncBtn.style.opacity = "0.6";
+      syncStatus.textContent = "🔄 スクレイパーを起動中...";
+      syncStatus.style.color = "#38bdf8";
+
+      try {
+        const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/scrape.yml/dispatches`, {
+          method: "POST",
+          headers: { "Accept": "application/vnd.github.v3+json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({ ref: "main" })
+        });
+
+        if (res.ok) {
+          syncStatus.textContent = "⏳ 抽出処理を開始しました（約2分で反映）...";
+          setTimeout(async () => {
+            syncStatus.textContent = "データを再読み込みしています...";
+            await loadAllData(); 
+            syncStatus.textContent = "✅ 最新データに更新しました！";
+            syncStatus.style.color = "#4ade80";
+            syncBtn.disabled = false; syncBtn.style.opacity = "1.0";
+            setTimeout(() => { syncStatus.textContent = ""; }, 3000);
+          }, 120000);
+        } else {
+          // Token権限エラーを検知して自動消去＆再入力を促す
+          if (res.status === 401 || res.status === 403 || res.status === 404) {
+            localStorage.removeItem('gh_pat_token');
+            throw new Error("Tokenの権限(workflow, repo)が不足しているか、無効です。ページを更新して再入力してください。");
+          }
+          throw new Error(`API起動エラー (HTTP ${res.status})`);
+        }
+      } catch (err) {
+        console.error(err);
+        syncStatus.textContent = `❌ ${err.message}`;
+        syncStatus.style.color = "#ef4444";
+        syncBtn.disabled = false; syncBtn.style.opacity = "1.0";
+      }
+    }
+
+    function getSubjectClass(subject) {
+      if (!subject) return 'subj-other';
+      const s = subject.toLowerCase();
+      if (s.includes('国語') || s.includes('文法')) return 'subj-japanese';
+      if (s.includes('算数') || s.includes('代数') || s.includes('幾何') || s.includes('数学') || s.includes('数量')) return 'subj-math';
+      if (s.includes('英語') || s.includes('grammar') || s.includes('reading') || s.includes('communication')) return 'subj-english';
+      if (s.includes('理科')) return 'subj-science';
+      if (s.includes('社会')) return 'subj-social';
+      return 'subj-other';
+    }
+    function getSubjectBorderClass(subject) { return getSubjectClass(subject).replace('subj-', 'border-'); }
+
+    function parseDeadlineToDate(str) {
+      if (!str) return new Date(8640000000000000);
+      const now = new Date();
+      let year = now.getFullYear(); let month = now.getMonth(); let day = now.getDate();
+      let hour = 23, minute = 59;
+      if (str.includes("今日")) {
+        year = now.getFullYear(); month = now.getMonth(); day = now.getDate();
+      } else if (str.includes("明日")) {
+        const tomorrow = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+        year = tomorrow.getFullYear(); month = tomorrow.getMonth(); day = tomorrow.getDate();
+      } else {
+        const isoMatch = str.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (isoMatch) { year = parseInt(isoMatch[1]); month = parseInt(isoMatch[2]) - 1; day = parseInt(isoMatch[3]); }
+        else {
+          const yearMatch = str.match(/(\d{4})年/);
+          if (yearMatch) year = parseInt(yearMatch[1]);
+          const mdMatch = str.match(/(\d{1,2})月(\d{1,2})日/) || str.match(/(\d{1,2})\/(\d{1,2})/);
+          if (mdMatch) { month = parseInt(mdMatch[1]) - 1; day = parseInt(mdMatch[2]); }
+        }
+      }
+      const timeMatch = str.match(/(\d{1,2}):(\d{2})/);
+      if (timeMatch) { hour = parseInt(timeMatch[1]); minute = parseInt(timeMatch[2]); }
+      return new Date(year, month, day, hour, minute);
+    }
+
+    function renderApp() {
+      const now = new Date();
+      document.getElementById('resetArea').style.display = userData.hidden_tasks.length > 0 ? 'block' : 'none';
+
+      const testRowContainer = document.getElementById('testRowContainer');
+      testRowContainer.innerHTML = '';
+      const autoStudyTasks = [];
+
+      userData.tests.sort((a, b) => new Date(a.date) - new Date(b.date));
+      document.getElementById('allTestCount').textContent = userData.tests.length;
+
+      const upcomingTests = userData.tests.filter(test => {
+        const testDate = new Date(test.date + 'T00:00:00');
+        const diffDays = Math.ceil((testDate - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / (1000 * 60 * 60 * 24));
+        return diffDays >= 0;
+      });
+
+      const MAX_VISIBLE_TESTS = 3;
+      const visibleTests = upcomingTests.slice(0, MAX_VISIBLE_TESTS);
+      const hiddenCount = upcomingTests.length - MAX_VISIBLE_TESTS;
+
+      visibleTests.forEach(test => {
+        const testDate = new Date(test.date + 'T00:00:00');
+        const diffDays = Math.ceil((testDate - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / (1000 * 60 * 60 * 24));
+
+        let badgeLabel = `あと${diffDays}日 (${test.date.slice(5)})`;
+        let isTomorrow = (diffDays === 1);
+        let isToday = (diffDays === 0);
+
+        if (isToday) badgeLabel = '本日実施！';
+        if (isTomorrow) badgeLabel = '明日！';
+
+        const subjClass = getSubjectClass(test.subject);
+        const borderClass = getSubjectBorderClass(test.subject);
+
         const card = document.createElement('div');
-        card.className = `relative px-2.5 py-2 rounded-xl cursor-pointer transition-all ${cardBg}`;
-        card.onclick = () => toggleSelect(stock.code);
+        card.className = `test-card ${borderClass} ${isTomorrow || isToday ? 'is-tomorrow' : ''}`;
         card.innerHTML = `
-            <button class="absolute bottom-2 right-2 p-1 text-slate-300 hover:text-red-500 transition-colors z-10" onclick="event.stopPropagation(); deleteStock('${stock.code}')">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-            </button>
-            <div class="flex items-center gap-1.5 mb-1">
-                <span class="bg-slate-100 text-slate-600 px-1 py-0.5 rounded text-[11px] font-medium tracking-wide">${stock.code}</span>
-                <span class="font-bold text-base leading-none text-slate-800">${stock.name}</span>
-                <span class="text-[10px] px-1 py-0.5 rounded font-medium" style="background-color: ${sColor}15; color: ${sColor}">${stock.sector}</span>
-            </div>
-            <div class="flex items-baseline gap-1.5 mb-0.5">
-                ${stock.selected ? `
-                    <span class="font-bold text-sm text-slate-800">${shares}株</span>
-                    <span class="text-slate-400 text-xs">(${formatMan(cost)})</span>
-                    <span class="text-emerald-600 font-bold text-sm ml-1">+${divNetItem.toLocaleString()}円/年<span class="text-[10px] ml-0.5 text-emerald-600/70">(手取り)</span></span>
-                ` : `
-                    <span class="text-slate-400 text-[11px] h-5 flex items-center">タップでシミュレーションに追加</span>
-                `}
-            </div>
-            <div class="flex items-baseline gap-2 text-[11px] text-slate-500 font-medium">
-                <span>${stock.price.toLocaleString()}円</span>
-                <span>利回り <span class="text-emerald-600 font-bold">${stock.yield}%</span></span>
-                <span>権利: ${stock.months}</span>
-            </div>
+          <div class="test-info">
+            <span class="badge-subject ${subjClass}" style="align-self:flex-start; font-size:0.7rem;">${test.subject}</span>
+            <span class="test-name" title="${test.title}">${test.title}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.4rem;">
+            <span class="test-date-badge ${isTomorrow || isToday ? 'urgent' : ''}">${badgeLabel}</span>
+            <button class="delete-btn" onclick="deleteTest('${test.id}')" title="削除">✖</button>
+          </div>
         `;
-        listEl.appendChild(card);
-    });
+        testRowContainer.appendChild(card);
 
-    const totalDivNet = Math.floor(totalDivGross * NET_RATIO);
-    const monthlyDivNet = Math.floor(totalDivNet / 12);
-    const avgYield = totalCost > 0 ? ((totalDivGross / totalCost) * 100).toFixed(2) : "0.00";
-    
-    document.getElementById('totalCost').textContent = totalCost.toLocaleString();
-    document.getElementById('remainBudget').textContent = (budgetTotal - totalCost).toLocaleString();
-    
-    document.getElementById('totalDividendGross').textContent = Math.floor(totalDivGross).toLocaleString();
-    document.getElementById('totalDividendNet').textContent = totalDivNet.toLocaleString();
-    document.getElementById('monthlyDividendNet').textContent = monthlyDivNet.toLocaleString();
-    document.getElementById('averageYield').textContent = avgYield;
-    
-    updateCharts(selectedStocks, budgetPerStock);
-}
-
-function toggleSelect(code) { const stock = stocks.find(s => s.code === code); if (stock) stock.selected = !stock.selected; saveData(); render(); }
-function selectAll(state) { stocks.forEach(s => s.selected = state); saveData(); render(); }
-function deleteStock(code) { stocks = stocks.filter(s => s.code !== code); saveData(); render(); }
-function autoSelect() {
-    selectAll(false);
-    const topBySector = {};
-    stocks.forEach(s => { if (!topBySector[s.sector] || s.yield > topBySector[s.sector].yield) topBySector[s.sector] = s; });
-    Object.values(topBySector).sort((a, b) => b.yield - a.yield).slice(0, 8).forEach(s => s.selected = true);
-    saveData(); render();
-}
-
-const modal = document.getElementById('importModal');
-const modalContent = document.getElementById('modalContent');
-function openModal() { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modalContent.classList.remove('scale-95'); }, 10); }
-function closeModal() { modal.classList.add('opacity-0'); modalContent.classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); }
-
-function copyPrompt() {
-    navigator.clipboard.writeText(`高配当銘柄を以下の形式で出力して(コード,社名,業種,現在株価,1株配当,権利確定月)：\n8058,三菱商事,卸売業,3080,100,3/9\n9432,NTT,情報・通信業,155,5.2,3/9`).then(() => {
-        const btn = document.getElementById('copyBtn');
-        const originalHTML = btn.innerHTML;
-        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> コピー完了!`;
-        btn.classList.add('text-emerald-600', 'bg-emerald-50');
-        setTimeout(() => { btn.innerHTML = originalHTML; btn.classList.remove('text-emerald-600', 'bg-emerald-50'); }, 2000);
-    });
-}
-
-async function pasteClipboard() {
-    try { document.getElementById('csvInput').value = await navigator.clipboard.readText(); } 
-    catch (err) { alert('クリップボードの読み取りが許可されていません。手動で貼り付けてください。'); }
-}
-
-function importCSV() {
-    const text = document.getElementById('csvInput').value;
-    if(!text.trim()) return closeModal();
-    if (document.querySelector('input[name="importMode"]:checked').value === 'replace') stocks = [];
-    parseAndAddCSV(text);
-    document.getElementById('csvInput').value = '';
-    closeModal();
-}
-
-function parseAndAddCSV(csvText) {
-    csvText.trim().split('\n').forEach(line => {
-        const [code, name, sector, price, dividend, months] = line.split(',');
-        if (code && name && price && dividend) {
-            const p = parseFloat(price); const d = parseFloat(dividend); const y = ((d / p) * 100).toFixed(2);
-            const existIdx = stocks.findIndex(s => s.code === code);
-            const newData = { code, name, sector, price: p, dividend: d, yield: y, months: months||'', selected: true };
-            if (existIdx >= 0) stocks[existIdx] = newData; else stocks.push(newData);
+        if (diffDays === 1 || diffDays === 0) {
+          autoStudyTasks.push({
+            id: `auto_study_${test.id}`,
+            subject: test.subject,
+            title: `📝【前日対策】${test.title}の総復習`,
+            deadline: isTomorrow ? '本日 22:00まで' : '本日実施',
+            isStudyTask: true,
+            dateObj: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 22, 0)
+          });
         }
-    });
-    saveData(); render();
-}
+      });
 
-function updateCharts(selectedStocks, budgetPerStock) {
-    const chartSec = document.getElementById('chartSection');
-    if (selectedStocks.length === 0) { chartSec.classList.add('hidden'); return; }
-    chartSec.classList.remove('hidden');
+      if (hiddenCount > 0) {
+        const moreCard = document.createElement('div');
+        moreCard.className = 'test-more-card';
+        moreCard.onclick = () => openModal('allTestsModal');
+        moreCard.innerHTML = `<span>＋他 ${hiddenCount} 件のテスト予定</span><span style="font-size:1.1rem;">❯</span>`;
+        testRowContainer.appendChild(moreCard);
+      } else if (upcomingTests.length === 0) {
+        testRowContainer.innerHTML = '<div style="color:#64748b; font-size:0.85rem; padding:0.5rem 0;">予定されている小テストはありません</div>';
+      }
 
-    const monthData = new Array(12).fill(0);
-    const sectorData = {};
+      renderAllTestsModal(upcomingTests);
 
-    selectedStocks.forEach(stock => {
-        const shares = Math.floor(budgetPerStock / stock.price);
-        const divNet = (shares * stock.dividend) * NET_RATIO;
-        
-        sectorData[stock.sector] = (sectorData[stock.sector] || 0) + divNet;
+      let allTasks = [...rawHomeworkItems, ...userData.manual_tasks];
+      const tomorrow15 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 15, 0, 0);
+      const threeDaysLater = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 23, 59, 59);
+      const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
 
-        const m = stock.months.split(/[/・、]/).map(x => parseInt(x.replace(/[^0-9]/g, ''))).filter(x => !isNaN(x));
-        if (m.length > 0) {
-            const divPerMonth = divNet / m.length;
-            m.forEach(month => { if (month >= 1 && month <= 12) monthData[month - 1] += divPerMonth; });
-        }
-    });
+      let items = allTasks.map(item => {
+        const d = parseDeadlineToDate(item.deadline);
+        let category = 'normal';
+        if (d < now) category = 'overdue';
+        else if (d <= tomorrow15) category = 'urgent';
+        else if (d <= threeDaysLater) category = 'warning';
+        return { ...item, dateObj: d, category };
+      });
 
-    if (charts.bar) charts.bar.destroy();
-    if (charts.pie) charts.pie.destroy();
+      autoStudyTasks.forEach(st => items.push({ ...st, category: 'urgent' }));
+      items = items.filter(i => i.dateObj >= thirtyDaysAgo && !userData.hidden_tasks.includes(i.id));
 
-    Chart.defaults.font.family = '-apple-system, sans-serif';
-    Chart.defaults.color = '#94a3b8';
+      const urgentItems = items.filter(i => i.category === 'urgent');
+      const urgentContainer = document.getElementById('urgentContainer');
+      urgentContainer.innerHTML = '';
+      document.getElementById('urgentCountBadge').textContent = `(${urgentItems.length}件)`;
 
-    charts.bar = new Chart(document.getElementById('barChart'), {
-        type: 'bar',
-        data: { labels: ['1','2','3','4','5','6','7','8','9','10','11','12'], datasets: [{ data: monthData, backgroundColor: '#34d399', borderRadius: 4 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => Math.floor(c.raw).toLocaleString() + '円' } } }, scales: { x: { grid: { display: false } }, y: { display: false, beginAtZero: true } } }
-    });
+      if (urgentItems.length === 0) {
+        urgentContainer.innerHTML = `
+          <div style="background:#1e293b; border-radius:10px; padding:2rem; text-align:center; color:#4ade80;">
+            <h3 style="font-size:1.4rem; margin-bottom:0.4rem;">🎉 至急のタスクはありません</h3>
+            <p style="color:#94a3b8; font-size:0.85rem;">明日に向けてしっかり準備ができています！</p>
+          </div>
+        `;
+      } else {
+        urgentItems.sort((a, b) => a.dateObj - b.dateObj);
+        urgentItems.forEach(item => {
+          const card = document.createElement('div');
+          const isStudy = item.isStudyTask;
+          const subjClass = getSubjectClass(item.subject);
 
-    const secLabels = Object.keys(sectorData);
-    charts.pie = new Chart(document.getElementById('pieChart'), {
-        type: 'doughnut',
-        data: { labels: secLabels, datasets: [{ data: Object.values(sectorData), backgroundColor: secLabels.map(l => getSectorColor(l)), borderWidth: 2, borderColor: '#ffffff' }] },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
-    });
-}
-</script>
+          card.className = `focus-card ${isStudy ? 'study-task' : 'urgent-task'}`;
+          card.innerHTML = `
+            <div class="card-top">
+              <div class="badge-group">
+                <span class="badge-subject ${subjClass}">${item.subject}</span>
+                ${item.isManual ? '<span class="badge-state badge-manual">手動</span>' : ''}
+                ${isStudy ? '<span class="badge-state badge-study">対策</span>' : '<span class="badge-state" style="background:#ef4444; color:#fff;">至急</span>'}
+              </div>
+              <button class="delete-btn" onclick="hideTask('${item.id}')">✖ 完了</button>
+            </div>
+            <div class="card-title">${item.title}</div>
+            <div class="card-bottom">
+              <span>🕒 締切: <strong>${item.deadline}</strong></span>
+            </div>
+          `;
+          urgentContainer.appendChild(card);
+        });
+      }
+
+      renderListGroup('warningList', 'warningCount', items.filter(i => i.category === 'warning'));
+      renderListGroup('normalList', 'normalCount', items.filter(i => i.category === 'normal'));
+      renderListGroup('overdueList', 'overdueCount', items.filter(i => i.category === 'overdue'));
+    }
+
+    function renderListGroup(containerId, countId, listItems) {
+      const container = document.getElementById(containerId);
+      document.getElementById(countId).textContent = listItems.length;
+      container.innerHTML = '';
+      if (listItems.length === 0) {
+        container.innerHTML = '<div style="padding:0.75rem 1rem; color:#64748b; font-size:0.85rem;">該当するタスクはありません</div>';
+        return;
+      }
+      listItems.sort((a, b) => a.dateObj - b.dateObj);
+      listItems.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'list-row';
+        const subjClass = getSubjectClass(item.subject);
+        row.innerHTML = `
+          <span class="badge-subject ${subjClass}" style="font-size:0.7rem;">${item.subject}</span>
+          <span class="row-title" title="${item.title}">${item.isManual ? '✏️ ' : ''}${item.title}</span>
+          <span class="row-deadline">${item.deadline}</span>
+          <button class="delete-btn" onclick="hideTask('${item.id}')">✖</button>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function renderAllTestsModal(tests) {
+      const container = document.getElementById('allTestsListContainer');
+      container.innerHTML = '';
+      if (tests.length === 0) {
+        container.innerHTML = '<div style="color:#94a3b8; font-size:0.9rem;">予定はありません</div>';
+        return;
+      }
+      tests.forEach(test => {
+        const subjClass = getSubjectClass(test.subject);
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:0.6rem 0.8rem; border-radius:6px; border:1px solid #334155;';
+        row.innerHTML = `
+          <div style="display:flex; align-items:center; gap:0.6rem;">
+            <span class="badge-subject ${subjClass}">${test.subject}</span>
+            <div>
+              <div style="font-size:0.9rem; font-weight:bold;">${test.title}</div>
+              <div style="font-size:0.75rem; color:#94a3b8;">📅 実施日: ${test.date}</div>
+            </div>
+          </div>
+          <button class="delete-btn" onclick="deleteTest('${test.id}')">✖ 削除</button>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function toggleCollapse(id) {
+      const el = document.getElementById(id);
+      const arrow = document.getElementById(id + '-arrow');
+      if (el.style.display === 'none') { el.style.display = 'block'; arrow.textContent = '▼'; }
+      else { el.style.display = 'none'; arrow.textContent = '▶'; }
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    window.hideTask = async function(taskId) {
+      if (!userData.hidden_tasks.includes(taskId)) {
+        userData.hidden_tasks.push(taskId);
+        renderApp();
+        await saveUserData();
+      }
+    };
+
+    window.clearHiddenTasks = async function() {
+      if (confirm('完了（非表示）にした課題をすべて元に戻しますか？\n（クラウド上の設定もリセットされます）')) {
+        userData.hidden_tasks = [];
+        renderApp();
+        await saveUserData();
+      }
+    };
+
+    window.deleteTest = async function(testId) {
+      if (confirm('この小テスト予定を削除しますか？')) {
+        userData.tests = userData.tests.filter(t => t.id !== testId);
+        renderApp();
+        await saveUserData();
+      }
+    };
+
+    window.saveManualTask = async function() {
+      const subject = document.getElementById('manualSubject').value.trim();
+      const title = document.getElementById('manualTitle').value.trim();
+      const deadlineVal = document.getElementById('manualDeadline').value;
+
+      if (!subject || !title || !deadlineVal) { alert('すべての項目を入力してください'); return; }
+
+      const d = new Date(deadlineVal);
+      const deadlineStr = `${d.getMonth()+1}月${d.getDate()}日(${['日','月','火','水','木','金','土'][d.getDay()]}) ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+
+      userData.manual_tasks.push({
+        id: 'manual_' + Date.now(),
+        subject, title, deadline: deadlineStr, isManual: true
+      });
+      
+      closeModal('taskModal');
+      document.getElementById('manualSubject').value = '';
+      document.getElementById('manualTitle').value = '';
+      document.getElementById('manualDeadline').value = '';
+      
+      renderApp();
+      await saveUserData();
+    };
+
+    window.saveTestSchedule = async function() {
+      const subject = document.getElementById('testSubject').value.trim();
+      const title = document.getElementById('testTitle').value.trim();
+      const date = document.getElementById('testDate').value;
+
+      if (!subject || !title || !date) { alert('すべての項目を入力してください'); return; }
+
+      userData.tests.push({ id: 'test_' + Date.now(), subject, title, date });
+      
+      closeModal('testModal');
+      document.getElementById('testSubject').value = '';
+      document.getElementById('testTitle').value = '';
+      document.getElementById('testDate').value = '';
+      
+      renderApp();
+      await saveUserData();
+    };
+
+    initializeApp();
+    async function initializeApp() {
+      await loadAllData();
+    }
+  </script>
 </body>
 </html>
