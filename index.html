@@ -51,7 +51,7 @@
         <section class="bg-white rounded-xl p-3 shadow-sm border border-slate-100 hidden" id="chartSection">
             <div class="grid grid-cols-2 gap-2">
                 <div>
-                    <h3 class="text-xs font-bold text-slate-400 text-center mb-1">配当カレンダー(手取り)</h3>
+                    <h3 class="text-xs font-bold text-slate-400 text-center mb-1">入金カレンダー(手取り)</h3>
                     <div class="h-32"><canvas id="barChart"></canvas></div>
                 </div>
                 <div>
@@ -364,7 +364,14 @@ function updateCharts(selectedStocks, budgetPerStock) {
         const m = stock.months.split(/[/・、]/).map(x => parseInt(x.replace(/[^0-9]/g, ''))).filter(x => !isNaN(x));
         if (m.length > 0) {
             const divPerMonth = divNet / m.length;
-            m.forEach(month => { if (month >= 1 && month <= 12) monthData[month - 1] += divPerMonth; });
+            m.forEach(month => { 
+                if (month >= 1 && month <= 12) {
+                    // 入金月を権利月の3ヶ月後として計算
+                    let paymentMonth = month + 3;
+                    if (paymentMonth > 12) paymentMonth -= 12;
+                    monthData[paymentMonth - 1] += divPerMonth; 
+                }
+            });
         }
     });
 
